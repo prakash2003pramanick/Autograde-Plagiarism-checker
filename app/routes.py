@@ -12,7 +12,7 @@ import requests
 main_bp = Blueprint('main', __name__)
 
 
-def download_drive_file(file_id, access_token="ya29.a0AZYkNZioJ3OkUocitnBT5JvqV2ncpfYHocTr_JBeCsmovl_OgRlxCQQV2n3VxwhHyS65kZwufMA1pFJaF0J3R7MIH_mJK5OQNSuh63QPfrA5CC3Nqn1pZt9QXZkv2SatGH0Tf6CHsnpKMCcHM5mQ8E7mDscQ746Jmi5MmtZmaCgYKASASARMSFQHGX2Mi89sgZwcEV0KnPyWCxvTSxA0175"):
+def download_drive_file(file_id, access_token):
     """
     Download a file from Google Drive using the file ID and an access token
     
@@ -63,6 +63,12 @@ def process_assignments():
         data = request.json
         print(data)
         
+        # Get access token from header
+        auth_header = request.headers.get('Authorization')
+        if not auth_header or not auth_header.startswith('Bearer '):
+            return jsonify({'error': 'Missing or invalid Authorization header'}), 401
+        access_token = auth_header.split(' ')[1]
+        
         if not data or 'courseWork' not in data:
             return jsonify({'error': 'Invalid request format'}), 400
 
@@ -99,8 +105,8 @@ def process_assignments():
 
                                 
                                 # Download the file from Google Drive
-                                file_content = download_drive_file(file_id)
-                                print("file Content", file_content)
+                                file_content = download_drive_file(file_id, access_token)
+                                # print("fi", file_content  )
                                 
                                 if file_content:
                                     safe_filename = file_name.replace(" ", "_")  # optional: sanitize filename
@@ -153,36 +159,33 @@ def process_assignments():
         
         # Calculate plagiarism scores
         plagiarism_scores = calculate_plagiarism_scores(minhash_dict, assignments_text)
-        
         print("hello")
-        
         # Filter assignments based on plagiarism threshold
         threshold = current_app.config['PLAGIARISM_THRESHOLD']
         selected_for_grading = {key: item for key, item in assignments_text.items() 
                              if plagiarism_scores[key] < threshold}
         
-        print("hello2")
-        
+     
         print(f"\nAssignments selected for grading (max plagiarism below {threshold}%):")
         for fname in selected_for_grading:
             print(fname)
             
         
         if selected_for_grading:     
-            print("hello3") 
+        
         # Group similar assignments
             selected_files = list(selected_for_grading.keys())
             selected_texts = [selected_for_grading[key]['text'] for key in selected_files]
             
-            print("hello4")
+         
             
             groups = group_similar_assignments(
                 selected_texts, 
                 selected_files, 
                 current_app.config['GROUP_SIMILARITY_THRESHOLD']
             )
-            
-            print("hello5")
+            print("helloji")
+      
             
             # Define assignment context for grading
             topic = "Fraud Detection and AI"
