@@ -15,8 +15,9 @@ def create_app(test_config=None):
     
     # Ensure the upload directories exist
     for folder in [app.config['UPLOAD_FOLDER'], 
-                  app.config['HANDWRITTEN_FOLDER'], 
-                  app.config['CONTEXT_FOLDER']]:
+                   app.config['HANDWRITTEN_FOLDER'], 
+                   app.config['CONTEXT_FOLDER'], 
+                   app.config['SUBMISSIONS_FOLDER']]:
         os.makedirs(folder, exist_ok=True)
     
     # Import and register routes

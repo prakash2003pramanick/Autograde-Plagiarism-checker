@@ -6,20 +6,20 @@ def calculate_plagiarism_scores(minhash_dict, assignment_text):
     Calculate plagiarism scores for all documents using MinHash Jaccard similarity
     """
     plagiarism_scores = {}
-    filenames = list(assignment_text.keys())
-    n = len(filenames)
+    keys = list(assignment_text.keys())
+    n = len(keys)
 
     for i in range(n):
-        fname = filenames[i]
+        key = keys[i]
         max_sim = 0.0
         for j in range(n):
             if i == j:
                 continue
-            other_fname = filenames[j]
-            sim = minhash_dict[fname].jaccard(minhash_dict[other_fname])
+            other_key= keys[j]
+            sim = minhash_dict[key].jaccard(minhash_dict[other_key])
             if sim > max_sim:
                 max_sim = sim
-        plagiarism_scores[fname] = max_sim * 100  # convert to percentage
+        plagiarism_scores[key] = max_sim * 100  # convert to percentage
 
     print("\nPlagiarism scores (maximum similarity in %):")
     for fname, score in plagiarism_scores.items():

@@ -34,6 +34,8 @@ def call_gemini_api_cached(assignment_text, context, pdf_context_extract=None, a
             "parts": [{"text": complete_prompt}]
         }]
     }
+    
+    print("inside gemini api")
 
     # Send the POST request to the Gemini API
     response = requests.post(api_url, headers=headers, json=payload)

@@ -11,6 +11,7 @@ class Config:
     UPLOAD_FOLDER = os.path.join(UPLOAD_BASE, 'UPLOAD_FOLDER')
     HANDWRITTEN_FOLDER = os.path.join(UPLOAD_BASE, 'HANDWRITTEN_FOLDER')
     CONTEXT_FOLDER = os.path.join(UPLOAD_BASE, 'CONTEXT_FOLDER')
+    SUBMISSIONS_FOLDER = os.path.join(UPLOAD_BASE, 'submissions')
     
     # File upload settings
     MAX_CONTENT_LENGTH = 16 * 1024 * 1024  # 16MB max file size
