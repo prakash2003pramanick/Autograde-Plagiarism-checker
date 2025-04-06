@@ -257,7 +257,11 @@ def process_assignments():
             }
         
         # Calculate overall statistics
-        overall_avg_plagiarism = round(np.mean(list(plagiarism_scores.values())), 2)
+        if plagiarism_scores:
+            overall_avg_plagiarism = round(np.mean(list(plagiarism_scores.values())), 2)
+        else:
+            overall_avg_plagiarism = 0.0  # or None, depending on your use case
+
         
         # Prepare the results in the expected format
         grading_results = []
