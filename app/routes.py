@@ -61,7 +61,7 @@ def process_assignments():
     """
     try:
         data = request.json
-        print(data)
+        # print(data)
         
         # Get access token from header
         auth_header = request.headers.get('Authorization')
@@ -69,8 +69,21 @@ def process_assignments():
             return jsonify({'error': 'Missing or invalid Authorization header'}), 401
         access_token = auth_header.split(' ')[1]
         
-        if not data or 'courseWork' not in data:
+        if not data or 'courseWork'  not in data:
             return jsonify({'error': 'Invalid request format'}), 400
+        
+        assignmentDescription="Title description"
+        assignmentTitle = "title"
+        
+        MAX_SCORE=100
+        assignmentInfo = data.get('assignmentInfo')
+        if assignmentInfo :
+             assignmentTitle = assignmentInfo.get('title', 'Untitled')
+             assignmentDescription = assignmentInfo.get('description', '')
+             MAX_SCORE = assignmentInfo.get('maxPoints', 100)
+        
+        print(assignmentDescription, assignmentTitle)
+     
 
         submissions = data['courseWork']
         print(f"Received {len(submissions)} submissions to process")
@@ -79,19 +92,19 @@ def process_assignments():
         submissions_path = current_app.config['SUBMISSIONS_FOLDER']
 
         pdf_context_extract = None
-        if 'context_pdf' in request.files:  
-            context_file = request.files['context_pdf']
-            if context_file and allowed_file(context_file.filename):
-                context_path = os.path.join(context_folder, secure_filename(context_file.filename))
-                context_file.save(context_path)
-                print(f"Extracting additional context from {context_file.filename} ...")
-                pdf_context_extract = extract_text_from_pdf(context_path)
+        # if 'context_pdf' in request.files:  
+        #     context_file = request.files['context_pdf']
+        #     if context_file and allowed_file(context_file.filename):
+        #         context_path = os.path.join(context_folder, secure_filename(context_file.filename))
+        #         context_file.save(context_path)
+        #         print(f"Extracting additional context from {context_file.filename} ...")
+        #         pdf_context_extract = extract_text_from_pdf(context_path)
         
         # Extract text from all assignment PDFs
         assignments_text = {}
+        
+        print(submissions)
         for submission in submissions:
-            if submission['state'] == 'TURNED_IN':
-                # Check if there are any file attachments
                 if 'assignmentSubmission' in submission and 'attachments' in submission['assignmentSubmission']:
                     for attachment in submission['assignmentSubmission']['attachments']:
                         if 'driveFile' in attachment:
@@ -184,22 +197,21 @@ def process_assignments():
                 selected_files, 
                 current_app.config['GROUP_SIMILARITY_THRESHOLD']
             )
-            print("helloji")
+          
       
             
             # Define assignment context for grading
-            topic = "Fraud Detection and AI"
             difficulty_level = "hard"
             assignment_context = f"""
-            Please thoroughly grade the following assignment on the topic of {topic}.
+            Please thoroughly grade the following assignment on the topic of {assignmentDescription}.
             Your evaluation should address the following aspects:
             1. **Clarity and Organization:** Assess how clearly the assignment is written and how well the content is structured.
-            2. **Technical Accuracy and Depth:** Evaluate the correctness and depth of technical details related to {topic}, including both theoretical understanding and practical application.
-            3. **Relevance to the Topic:** Check if the assignment covers key points, such as critical issues, innovative approaches, and context-specific challenges relevant to {topic}.
+            2. **Technical Accuracy and Depth:** Evaluate the correctness and depth of technical details related to {assignmentDescription}, including both theoretical understanding and practical application.
+            3. **Relevance to the Topic:** Check if the assignment covers key points, such as critical issues, innovative approaches, and context-specific challenges relevant to {assignmentDescription}.
             4. **Analytical Rigor:** Critically analyze the argumentation, supporting data, and reasoning presented.
             5. **Overall Coherence:** Consider the logical flow and coherence of the overall assignment.
 
-            Please grade the assignment at a {difficulty_level} level and provide a numerical grade out of 100 along with detailed, constructive feedback highlighting both strengths and areas for improvement.
+            Please grade the assignment at a {difficulty_level} level and provide a numerical grade out of {MAX_SCORE} along with detailed, constructive feedback highlighting both strengths and areas for improvement.
             Make sure that the provided assignment work or extract aligns with the topic correctly.
             """
 
@@ -211,7 +223,7 @@ def process_assignments():
                 # Combine texts from all assignments in this group
                 combined_text = "\n".join([selected_for_grading[selected_files[i]]['text'] for i in group])
                 # Call the Gemini API including the optional PDF context if available
-                print("hello6")
+              
                 result = call_gemini_api_cached(
                     combined_text, 
                     assignment_context, 
@@ -219,7 +231,7 @@ def process_assignments():
                     current_app.config['API_KEY']
                 )
                 
-                print("hello7")
+               
                 
                 for i in group: 
                     group_grades[selected_files[i]] = result
