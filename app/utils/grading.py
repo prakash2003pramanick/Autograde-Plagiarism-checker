@@ -28,6 +28,11 @@ def call_gemini_api_cached(assignment_text, context, pdf_context_extract=None, a
     if pdf_context_extract:
         complete_prompt += pdf_context_extract + "\n"
     complete_prompt += "Assignment Work: " + assignment_text
+    
+    
+    # Add explicit grading instructions
+    complete_prompt += "\n\nEvaluate this assignment based on the assignment description above. Provide detailed feedback and assign a numerical grade out of 100. If the submission is completely irrelevant to the assignment topic, the grade should be 0. Please start your response with 'Overall Grade: X/100' where X is the numerical grade."
+
 
     payload = {
         "contents": [{
@@ -36,7 +41,8 @@ def call_gemini_api_cached(assignment_text, context, pdf_context_extract=None, a
     }
     
     print("inside gemini api")
-
+    print("Sending prompt with length:", len(complete_prompt))
+   
     # Send the POST request to the Gemini API
     response = requests.post(api_url, headers=headers, json=payload)
 
@@ -61,14 +67,17 @@ def call_gemini_api_cached(assignment_text, context, pdf_context_extract=None, a
     # Extract the exact grade from the generated text (searching for a pattern like "Overall Grade: 78/100")
     grade_pattern = r'Overall Grade:\s*(\d+)\s*/\s*100'
     grade_match = re.search(grade_pattern, generated_text, re.IGNORECASE)
-    
+
     if grade_match:
         exact_grade = int(grade_match.group(1))
-        # Remove the grade line from the feedback for a cleaner output
         cleaned_feedback = re.sub(grade_pattern + r'.*', '', generated_text, flags=re.IGNORECASE).strip()
     else:
-        # Fallback grade calculation if not explicitly found in response
-        exact_grade = min(100, len(assignment_text.split()) // 10)
+        # Check for verbalized failing indicators
+        if any(phrase in generated_text.lower() for phrase in ["completely irrelevant", "failing grade", "unacceptable submission"]):
+            exact_grade = 0
+        else:
+            # Word-count based fallback
+            exact_grade = min(100, len(assignment_text.split()) // 10)
         cleaned_feedback = generated_text
 
     result = {"grade": exact_grade, "feedback": cleaned_feedback}

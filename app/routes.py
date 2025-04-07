@@ -82,6 +82,8 @@ def process_assignments():
                 MAX_SCORE = assignmentInfo.get('maxPoints', 100)
         except Exception as e:
             print(f"Error parsing assignment info: {str(e)}")
+            
+        print("description", assignmentDescription)
 
         submissions = data['courseWork']
         print(f"Received {len(submissions)} submissions to process")
@@ -89,7 +91,7 @@ def process_assignments():
         context_folder = current_app.config['CONTEXT_FOLDER']
         submissions_path = current_app.config['SUBMISSIONS_FOLDER']
 
-        pdf_context_extract = None  # Add your PDF context if needed
+        pdf_context_extract = assignmentDescription  # Add your PDF context if needed
         assignments_text = {}
 
         for submission in submissions:
@@ -171,9 +173,18 @@ def process_assignments():
 
                 difficulty_level = "hard"
                 assignment_context = f"""
-                Please thoroughly grade the following assignment on the topic of {assignmentDescription}.
-                <...context block same as before...>
-                """
+                    Please thoroughly grade the following assignment on the topic of {assignmentDescription}.
+                    Your evaluation should address the following aspects:
+                    1. **Clarity and Organization:** Assess how clearly the assignment is written and how well the content is structured.
+                    2. **Technical Accuracy and Depth:** Evaluate the correctness and depth of technical details related to {assignmentDescription}, including both theoretical understanding and practical application.
+                    3. **Relevance to the Topic:** Check if the assignment covers key points, such as critical issues, innovative approaches, and context-specific challenges relevant to {assignmentDescription}.
+                    4. **Analytical Rigor:** Critically analyze the argumentation, supporting data, and reasoning presented.
+                    5. **Overall Coherence:** Consider the logical flow and coherence of the overall assignment.
+
+                    Please grade the assignment at a {difficulty_level} level and provide a numerical grade out of {MAX_SCORE} along with detailed, constructive feedback highlighting both strengths and areas for improvement.
+                    Make sure that the provided assignment work or extract aligns with the topic correctly.
+                    """
+
 
                 group_grades = {}
                 print("Grading groups using Gemini API...")
