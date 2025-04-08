@@ -1,0 +1,42 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+*.so
+*.egg
+*.egg-info/
+*.pyo
+*.pyd
+
+# Virtual environments
+env/
+venv/
+my_env/
+.venv/
+
+# Environment variables
+.env
+*.env
+
+# Python test & coverage
+.coverage
+.cache/
+.pytest_cache/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# OS junk
+*.swp
+*~
+
+# Logs
+*.log
+
+# Render-specific or IDE stuff
+.vscode/
+.idea/

@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: assignment-grader
+    env: docker
+    buildCommand: ./build.sh
+    startCommand: gunicorn --bind 0.0.0.0:$PORT run:app
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: MAX_CONTENT_LENGTH
+        value: 16777216  # 16MB in bytes
+      - key: PLAGIARISM_THRESHOLD
+        value: 30
+      - key: GROUP_SIMILARITY_THRESHOLD
+        value: 0.8
+    disk:
+      name: data
+      mountPath: /app/uploads
+      sizeGB: 1
