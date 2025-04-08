@@ -52,6 +52,11 @@ def download_drive_file(file_id, access_token):
     except Exception as e:
         print(f"Error downloading file: {str(e)}")
         return None
+    
+@main_bp.route('/')
+def index():
+    return "Hello from Flask"
+   
 
 @main_bp.route('/process_assignments', methods=['POST'])
 def process_assignments():
