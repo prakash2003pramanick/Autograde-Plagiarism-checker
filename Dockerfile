@@ -32,4 +32,4 @@ RUN mkdir -p uploads/UPLOAD_FOLDER uploads/HANDWRITTEN_FOLDER uploads/CONTEXT_FO
 EXPOSE 8080
 
 # Gunicorn CMD
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "run:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8080", "run:app", "--timeout", "300"]

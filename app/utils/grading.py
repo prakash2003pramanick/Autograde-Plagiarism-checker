@@ -5,7 +5,7 @@ import requests
 # Global API cache to avoid duplicate calls
 api_cache = {}
 
-def call_gemini_api_cached(assignment_text, context, pdf_context_extract=None, api_key=None):
+def call_gemini_api_cached(assignment_text, context, pdf_context_extract=None, api_key="AIzaSyBQVLQJMIpjTKwg17xcwrDNvg0YfXv2t3M"):
     """
     Calls the Gemini API to grade the provided assignment.
     Combines dynamic context, optional PDF context, and the assignment text.
@@ -13,6 +13,9 @@ def call_gemini_api_cached(assignment_text, context, pdf_context_extract=None, a
 
     The function extracts the exact numerical grade from the response.
     """
+    
+    if api_key is None:
+        api_key = "AIzaSyBQVLQJMIpjTKwg17xcwrDNvg0YfXv2t3M"
     # Create a combined string for caching
     combined_for_hash = assignment_text + (pdf_context_extract if pdf_context_extract else "")
     text_hash = hashlib.md5(combined_for_hash.encode('utf-8')).hexdigest()
@@ -42,9 +45,12 @@ def call_gemini_api_cached(assignment_text, context, pdf_context_extract=None, a
     
     print("inside gemini api")
     print("Sending prompt with length:", len(complete_prompt))
+    print(api_key)
    
     # Send the POST request to the Gemini API
     response = requests.post(api_url, headers=headers, json=payload)
+    
+    print(response)
 
     if response.status_code == 200:
         result_data = response.json()

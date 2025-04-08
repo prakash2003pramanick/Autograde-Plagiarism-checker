@@ -1,6 +1,7 @@
 from flask import current_app
 from pdf2image import convert_from_path
 import pytesseract
+import time
 
 def allowed_file(filename):
     """
@@ -21,7 +22,9 @@ def extract_text_from_pdf(pdf_path):
 
     text = ""
     for page in pages:
+        start = time.time()
         page_text = pytesseract.image_to_string(page)
+        print(f"OCR took {time.time() - start:.2f}s for one page")
         text += page_text + "\n"
 
     print(f"Extracted text from {pdf_path}")

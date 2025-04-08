@@ -3,6 +3,7 @@ from datasketch import MinHash
 
 # Download NLTK data
 nltk.download('punkt', quiet=True)
+nltk.download('punkt_tab')  # Add this line
 
 def get_shingles(text, default_k=5):
     """
