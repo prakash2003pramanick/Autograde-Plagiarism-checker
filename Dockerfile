@@ -9,27 +9,25 @@ RUN apt-get update && apt-get install -y \
     libffi-dev \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Set workdir
+# Set working directory
 WORKDIR /app
 
-# Upgrade pip
-RUN python -m pip install --upgrade pip
-
-# Install Python deps
+# Upgrade pip and install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN python -m pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
 # Download NLTK models
 RUN python -m nltk.downloader punkt
 
-# Copy source
+# Copy source code
 COPY . .
 
-# Create directories
+# Create necessary upload directories
 RUN mkdir -p uploads/UPLOAD_FOLDER uploads/HANDWRITTEN_FOLDER uploads/CONTEXT_FOLDER uploads/submissions
 
-# Port
+# Expose port
 EXPOSE 8080
 
-# Gunicorn CMD
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "run:app", "--timeout", "300"]
+# Run Flask development server
+CMD ["flask", "run"]
