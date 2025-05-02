@@ -9,50 +9,282 @@ from app.utils.plagiarism import calculate_plagiarism_scores, group_similar_assi
 from app.utils.grading import call_gemini_api_cached
 import tempfile
 import requests
+import re
+import io
+from urllib.parse import urlparse, parse_qs
 main_bp = Blueprint('main', __name__)
 
-
-def download_drive_file(file_id, access_token):
+def fetch_pdf_bytes(url, access_token):
     """
-    Download a file from Google Drive using the file ID and an access token
+    Download PDF bytes from Google Drive URL or direct URL
     
     Args:
-        file_id (str): The Google Drive file ID
-        access_token (str): OAuth2 access token for Google Drive API
+        url: Google Drive share URL or direct URL to PDF
+        access_token: OAuth access token for Google Drive API
         
     Returns:
-        bytes: The file content or None if download failed
+        bytes: Raw PDF content as bytes
     """
-    # Using the Google Drive API v3 endpoint to download file content
-    download_url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
     
-    # Set up authentication headers with the access token
-    headers = {
-        "Authorization": f"Bearer {access_token}"
-    }
+    # Create a session for connection pooling
+    session = requests.Session()
+    
+    # Extract file ID if it's a Google Drive URL
+    file_id = extract_drive_file_id(url)
+    
+    if file_id:
+        print(f"Detected Google Drive file ID: {file_id}")
+        
+        # Try multiple methods to download the file
+        pdf_bytes = None
+        errors = []
+        
+        # Method 1: Direct API access with token
+        if access_token:
+            try:
+                # Use the direct download URL
+                download_url = f"https://www.googleapis.com/drive/v3/files/{file_id}?alt=media"
+                headers = {
+                    "Authorization": f"Bearer {access_token}"
+                }
+                
+                print(f"Method 1: Trying API download with access token")
+                resp = session.get(download_url, headers=headers, stream=True, timeout=30)
+                resp.raise_for_status()
+                pdf_bytes = resp.content
+                print(f"Method 1: Successfully downloaded {len(pdf_bytes)} bytes")
+                return pdf_bytes
+            except requests.RequestException as e:
+                errors.append(f"Method 1 failed: {str(e)}")
+                print(errors[-1])
+        
+        # Method 2: Using the export=download parameter (works for publicly accessible files)
+        try:
+            print(f"Method 2: Trying public download link")
+            direct_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+            resp = session.get(direct_url, stream=True, timeout=30)
+            resp.raise_for_status()
+            
+            # Check if we need to confirm download (large files)
+            if 'text/html' in resp.headers.get('Content-Type', ''):
+                # Extract confirmation token
+                confirm_token = None
+                for k, v in session.cookies.items():
+                    if k.startswith('download_warning'):
+                        confirm_token = v
+                        break
+                
+                # If token found, make a second request with confirmation
+                if confirm_token:
+                    print(f"Method 2: Large file detected, confirming download with token")
+                    direct_url = f"https://drive.google.com/uc?export=download&id={file_id}&confirm={confirm_token}"
+                    resp = session.get(direct_url, stream=True, timeout=30)
+                    resp.raise_for_status()
+            
+            pdf_bytes = resp.content
+            
+            # Validate PDF header
+            if pdf_bytes.startswith(b'%PDF'):
+                print(f"Method 2: Successfully downloaded {len(pdf_bytes)} bytes")
+                return pdf_bytes
+            else:
+                errors.append(f"Method 2: Downloaded content is not a valid PDF")
+                print(errors[-1])
+        except requests.RequestException as e:
+            errors.append(f"Method 2 failed: {str(e)}")
+            print(errors[-1])
+        
+        # Method 3: Try the files.get endpoint with fields=webContentLink
+        if access_token:
+            try:
+                print(f"Method 3: Getting webContentLink via API")
+                metadata_url = f"https://www.googleapis.com/drive/v3/files/{file_id}?fields=webContentLink"
+                headers = {
+                    "Authorization": f"Bearer {access_token}"
+                }
+                
+                resp = session.get(metadata_url, headers=headers, timeout=30)
+                resp.raise_for_status()
+                metadata = resp.json()
+                
+                if 'webContentLink' in metadata:
+                    content_link = metadata['webContentLink']
+                    print(f"Method 3: Got webContentLink: {content_link}")
+                    
+                    resp = session.get(content_link, stream=True, timeout=30)
+                    resp.raise_for_status()
+                    pdf_bytes = resp.content
+                    
+                    if pdf_bytes.startswith(b'%PDF'):
+                        print(f"Method 3: Successfully downloaded {len(pdf_bytes)} bytes")
+                        return pdf_bytes
+                    else:
+                        errors.append(f"Method 3: Downloaded content is not a valid PDF")
+                        print(errors[-1])
+                else:
+                    errors.append(f"Method 3: No webContentLink available")
+                    print(errors[-1])
+            except requests.RequestException as e:
+                errors.append(f"Method 3 failed: {str(e)}")
+                print(errors[-1])
+            except ValueError as e:
+                errors.append(f"Method 3 JSON error: {str(e)}")
+                print(errors[-1])
+        
+        # If we reached here, all methods failed
+        error_msg = "All download methods failed:\n" + "\n".join(errors)
+        print(error_msg)
+        raise Exception(error_msg)
+    else:
+        # Direct download for non-Drive URLs
+        print(f"Direct download from URL: {url}")
+        try:
+            resp = session.get(url, stream=True, timeout=30)
+            resp.raise_for_status()
+        except requests.RequestException as e:
+            print(f"Error downloading from URL: {e}")
+            raise
+    
+    # Check if we got a PDF
+    content_type = resp.headers.get('Content-Type', '')
+    if 'application/pdf' not in content_type and not url.lower().endswith('.pdf'):
+        print(f"Warning: Content type '{content_type}' may not be a PDF")
+    
+    # Read all content into a BytesIO buffer
+    buf = io.BytesIO()
+    total_size = 0
+    
+    for chunk in resp.iter_content(chunk_size=8192):
+        if chunk:
+            buf.write(chunk)
+            total_size += len(chunk)
+            
+    print(f"Downloaded {total_size} bytes")
+    
+    # Get the bytes from the buffer
+    pdf_bytes = buf.getvalue()
+    
+    # Basic validation - PDF files start with '%PDF'
+    if not pdf_bytes.startswith(b'%PDF'):
+        print("Warning: Downloaded content doesn't appear to be a valid PDF")
+        print(f"First 20 bytes: {pdf_bytes[:20]}")
+    
+    return pdf_bytes
+
+def extract_drive_file_id(url):
+    """
+    Extract Google Drive file ID from various formats of Google Drive URLs
+    """
+    import re
+    from urllib.parse import urlparse, parse_qs
+    
+    # Check if it's a standard Google Drive URL
+    if 'drive.google.com' in url:
+        # Pattern for '/d/<id>' or '/file/d/<id>' format
+        id_match = re.search(r'/d/([a-zA-Z0-9_-]+)', url)
+        if id_match:
+            return id_match.group(1)
+            
+        # Pattern for 'id=<id>' format (used in older Drive links)
+        id_param = re.search(r'id=([a-zA-Z0-9_-]+)', url)
+        if id_param:
+            return id_param.group(1)
+            
+        # Try to parse as URL and extract ID from query parameters
+        parsed_url = urlparse(url)
+        query_params = parse_qs(parsed_url.query)
+        
+        if 'id' in query_params:
+            return query_params['id'][0]
+    
+    # Check if this is already just a file ID
+    if re.match(r'^[a-zA-Z0-9_-]{25,}$', url.strip()):
+        return url.strip()
+    
+    # Not a Google Drive URL or ID not found
+    return None
+
+def verify_access_token(access_token):
+    """
+    Verify if the access token is valid and has the required scopes
+    
+    Args:
+        access_token: OAuth access token for Google Drive API
+        
+    Returns:
+        bool: True if token is valid, False otherwise
+        dict: Token information if valid
+    """
+    import requests
+    
+    # Google's token info endpoint
+    token_info_url = f"https://oauth2.googleapis.com/tokeninfo?access_token={access_token}"
     
     try:
-        print(f"Downloading file {file_id} using access token")
-        response = requests.get(download_url, headers=headers)
+        response = requests.get(token_info_url, timeout=10)
         
         if response.status_code == 200:
-            print(f"Successfully downloaded file {file_id}")
-            return response.content
+            token_info = response.json()
+            
+            # Check if token has drive scope
+            required_scope = "https://www.googleapis.com/auth/drive"
+            scopes = token_info.get('scope', '').split(' ')
+            
+            has_drive_scope = False
+            for scope in scopes:
+                if scope == required_scope or scope.startswith(required_scope + '.'):
+                    has_drive_scope = True
+                    break
+            
+            if not has_drive_scope:
+                print("Token is valid but lacks Drive scope!")
+                return False, token_info
+            
+            # Check expiration
+            expires_in = int(token_info.get('expires_in', 0))
+            if expires_in < 60:  # Less than a minute
+                print(f"Token will expire soon! Only {expires_in} seconds left")
+            
+            print(f"Access token is valid for {expires_in} more seconds")
+            return True, token_info
         else:
-            print(f"Failed to download file: HTTP {response.status_code}")
-            print(f"Response: {response.text}")
-            
-            # If token expired (401) or insufficient permissions (403), provide more info
-            if response.status_code == 401:
-                print("Authentication failed: Access token may be expired")
-            elif response.status_code == 403:
-                print("Access denied: Insufficient permissions to access this file")
-            
-            return None
+            print(f"Token validation failed: {response.status_code}")
+            print(response.text)
+            return False, None
     except Exception as e:
-        print(f"Error downloading file: {str(e)}")
-        return None
+        print(f"Error validating token: {str(e)}")
+        return False, None
+
+# Add to the process_assignments route
+def validate_request(request_data, access_token):
+    """
+    Validate the incoming request data and access token
     
+    Args:
+        request_data: The request JSON data
+        access_token: The OAuth access token
+        
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    # Check required fields
+    if not request_data or 'courseWork' not in request_data:
+        return False, "Missing 'courseWork' field in request"
+    
+    # Validate access token
+    is_valid, token_info = verify_access_token(access_token)
+    if not is_valid:
+        return False, "Invalid or expired access token"
+    
+    # Check submissions format
+    submissions = request_data['courseWork']
+    if not isinstance(submissions, list) or len(submissions) == 0:
+        return False, "No valid submissions found in request"
+    
+    # Success
+    return True, ""
+
+
 @main_bp.route('/')
 def index():
     return "Hello from Flask"
@@ -61,10 +293,13 @@ def index():
 @main_bp.route('/process_assignments', methods=['POST'])
 def process_assignments():
     """
-    Comprehensive assignment processing endpoint 
+    Comprehensive assignment processing endpoint that processes PDF bytes directly
+    without storing files on disk
     """
     try:
         data = request.json
+        
+        print("Incoming request:", data)
 
         # Get access token from header
         auth_header = request.headers.get('Authorization')
@@ -72,9 +307,12 @@ def process_assignments():
             return jsonify({'error': 'Missing or invalid Authorization header'}), 401
         access_token = auth_header.split(' ')[1]
 
-        if not data or 'courseWork' not in data:
-            return jsonify({'error': 'Invalid request format'}), 400
+        # Validate request and access token
+        is_valid, error_message = validate_request(data, access_token)
+        if not is_valid:
+            return jsonify({'error': error_message}), 400
 
+        # Get assignment information
         assignmentDescription = "Title description"
         assignmentTitle = "title"
         MAX_SCORE = 100
@@ -88,66 +326,111 @@ def process_assignments():
         except Exception as e:
             print(f"Error parsing assignment info: {str(e)}")
             
-        print("description", assignmentDescription)
+        print("Assignment description:", assignmentDescription)
 
         submissions = data['courseWork']
         print(f"Received {len(submissions)} submissions to process")
 
-        context_folder = current_app.config['CONTEXT_FOLDER']
-        submissions_path = current_app.config['SUBMISSIONS_FOLDER']
-
-        pdf_context_extract = assignmentDescription  # Add your PDF context if needed
+        pdf_context_extract = assignmentDescription
         assignments_text = {}
+        failed_submissions = []
 
+        # Process each submission
         for submission in submissions:
             try:
-                if 'assignmentSubmission' in submission and 'attachments' in submission['assignmentSubmission']:
-                    for attachment in submission['assignmentSubmission']['attachments']:
-                        try:
-                            if 'driveFile' in attachment:
-                                drive_file = attachment['driveFile']
-                                file_id = drive_file['id']
-                                file_name = drive_file.get('title')
+                if 'assignmentSubmission' not in submission or 'attachments' not in submission['assignmentSubmission']:
+                    failed_submissions.append({
+                        'submission_id': submission.get('id', 'unknown'),
+                        'error': 'Missing assignment submission or attachments'
+                    })
+                    continue
+                    
+                for attachment in submission['assignmentSubmission']['attachments']:
+                    if 'driveFile' not in attachment:
+                        continue
+                        
+                    drive_file = attachment['driveFile']
+                    file_id = drive_file['id']
+                    file_name = drive_file.get('title')
 
-                                if isinstance(file_name, str) and file_name.lower().endswith('.pdf'):
-                                    file_content = download_drive_file(file_id, access_token)
-                                    if file_content:
-                                        safe_filename = file_name.replace(" ", "_")
-                                        save_path = os.path.join(submissions_path, safe_filename)
-
-                                        with open(save_path, 'wb') as f:
-                                            f.write(file_content)
-                                        print(f"File saved permanently at: {save_path}")
-
-                                        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as temp_file:
-                                            temp_file.write(file_content)
-                                            temp_path = temp_file.name
-
-                                        try:
-                                            extracted_text = extract_text_from_pdf(temp_path)
-                                            if extracted_text:
-                                                key = f"{submission['id']}_{file_name}"
-                                                assignments_text[key] = {
-                                                    'text': extracted_text,
-                                                    'submission_id': submission['id'],
-                                                    'user_id': submission['userId'],
-                                                    'file_name': file_name
-                                                }
-                                            else:
-                                                print(f"Warning: No text extracted from {file_name}")
-                                        except Exception as e:
-                                            print(f"Error extracting text from {file_name}: {str(e)}")
-                                        finally:
-                                            os.unlink(temp_path)
-                                    else:
-                                        print(f"Could not download file: {file_name}")
-                        except Exception as e:
-                            print(f"Error processing attachment: {str(e)}")
+                    # Only process PDF files
+                    if not isinstance(file_name, str) or not file_name.lower().endswith('.pdf'):
+                        print(f"Skipping non-PDF file: {file_name}")
+                        continue
+                        
+                    pdf_url = drive_file.get('alternateLink')
+                    if not pdf_url:
+                        print(f"Missing alternateLink in drive file for {file_name}")
+                        failed_submissions.append({
+                            'submission_id': submission.get('id', 'unknown'),
+                            'file_name': file_name,
+                            'error': 'Missing alternateLink in drive file'
+                        })
+                        continue
+                        
+                    print(f"Processing PDF URL: {pdf_url}")
+                    
+                    try:
+                        # Try to download PDF with our improved method
+                        pdf_bytes = fetch_pdf_bytes(pdf_url, access_token)
+                        print(f"Downloaded {len(pdf_bytes)} bytes from {pdf_url}")
+                        
+                        # Verify PDF header
+                        if pdf_bytes[:4] != b'%PDF':
+                            error_msg = f"Downloaded content doesn't appear to be a valid PDF for {file_name}"
+                            print(f"Warning: {error_msg}")
+                            failed_submissions.append({
+                                'submission_id': submission.get('id', 'unknown'),
+                                'file_name': file_name,
+                                'error': error_msg
+                            })
+                            continue
+                        
+                        # Extract text directly from PDF bytes
+                        extracted_text = extract_text_from_pdf(pdf_bytes)
+                        
+                        if extracted_text:
+                            key = f"{submission['id']}_{file_name}"
+                            assignments_text[key] = {
+                                'text': extracted_text,
+                                'submission_id': submission['id'],
+                                'user_id': submission['userId'],
+                                'file_name': file_name
+                            }
+                        else:
+                            error_msg = f"No text could be extracted from {file_name}"
+                            print(f"Warning: {error_msg}")
+                            failed_submissions.append({
+                                'submission_id': submission.get('id', 'unknown'),
+                                'file_name': file_name,
+                                'error': error_msg
+                            })
+                            
+                    except Exception as e:
+                        error_msg = f"Error processing PDF {file_name}: {str(e)}"
+                        print(error_msg)
+                        failed_submissions.append({
+                            'submission_id': submission.get('id', 'unknown'),
+                            'file_name': file_name,
+                            'error': error_msg
+                        })
             except Exception as e:
                 print(f"Error processing submission: {str(e)}")
+                failed_submissions.append({
+                    'submission_id': submission.get('id', 'unknown'),
+                    'error': f"Unexpected error: {str(e)}"
+                })
 
-        print("Text extraction completed.")
+        print(f"Text extraction completed for {len(assignments_text)} documents.")
+        print(f"Failed to process {len(failed_submissions)} submissions.")
 
+        if not assignments_text:
+            return jsonify({
+                'error': 'No valid submissions could be processed',
+                'failed_submissions': failed_submissions
+            }), 400
+
+        # Continue with the rest of the processing...
         # MinHash and plagiarism detection
         try:
             minhash_dict = {
@@ -156,7 +439,10 @@ def process_assignments():
 
             plagiarism_scores = calculate_plagiarism_scores(minhash_dict, assignments_text)
         except Exception as e:
-            return jsonify({'error': f'Error during plagiarism detection: {str(e)}'}), 500
+            return jsonify({
+                'error': f'Error during plagiarism detection: {str(e)}',
+                'failed_submissions': failed_submissions
+            }), 500
 
         threshold = current_app.config['PLAGIARISM_THRESHOLD']
         selected_for_grading = {
@@ -190,7 +476,6 @@ def process_assignments():
                     Make sure that the provided assignment work or extract aligns with the topic correctly.
                     """
 
-
                 group_grades = {}
                 print("Grading groups using Gemini API...")
                 for group in groups:
@@ -207,7 +492,7 @@ def process_assignments():
                     except Exception as e:
                         print(f"Error grading group {group}: {str(e)}")
 
-                # Penalty grading
+                # Penalty grading for plagiarized submissions
                 for key in assignments_text.keys():
                     if key not in selected_for_grading:
                         plagiarism_percent = plagiarism_scores.get(key, 100)
@@ -218,6 +503,7 @@ def process_assignments():
                         }
 
             else:
+                # All submissions have high similarity
                 group_grades = {}
                 for key in assignments_text.keys():
                     plagiarism_percent = plagiarism_scores.get(key, 100)
@@ -228,7 +514,10 @@ def process_assignments():
                     }
 
         except Exception as e:
-            return jsonify({'error': f'Error during grading: {str(e)}'}), 500
+            return jsonify({
+                'error': f'Error during grading: {str(e)}',
+                'failed_submissions': failed_submissions
+            }), 500
 
         # Compile results
         submission_results = {}
@@ -260,7 +549,8 @@ def process_assignments():
 
         return jsonify({
             'overall_avg_plagiarism': overall_avg_plagiarism,
-            'grading_results': grading_results
+            'grading_results': grading_results,
+            'failed_submissions': failed_submissions
         })
 
     except Exception as e:

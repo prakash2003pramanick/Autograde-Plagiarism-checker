@@ -1,35 +1,38 @@
-FROM python:3.12.2
+# Use official Python image
+FROM python:3.12-slim
 
-# System dependencies
+# Set environment to non-interactive
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system-level dependencies
 RUN apt-get update && apt-get install -y \
     tesseract-ocr \
-    libpoppler-cpp-dev \
     poppler-utils \
+    libpoppler-cpp-dev \
     build-essential \
     libffi-dev \
+    curl \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Set workdir
+# Set working directory
 WORKDIR /app
 
-# Upgrade pip
-RUN python -m pip install --upgrade pip
-
-# Install Python deps
+# Copy and install Python dependencies
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# Download NLTK models
+# Download required NLTK models
 RUN python -m nltk.downloader punkt
 
-# Copy source
+# Copy project files
 COPY . .
 
-# Create directories
+# Create upload directories
 RUN mkdir -p uploads/UPLOAD_FOLDER uploads/HANDWRITTEN_FOLDER uploads/CONTEXT_FOLDER uploads/submissions
 
-# Port
-EXPOSE 8080
+# Expose application port
+EXPOSE 80
 
-# Gunicorn CMD
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "run:app", "--timeout", "300"]
+# Run the app
+CMD ["python", "run.py"]
