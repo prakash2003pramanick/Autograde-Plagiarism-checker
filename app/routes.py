@@ -258,6 +258,17 @@ def process_assignments():
                 'feedback': result['feedback']
             })
 
+        # Cleanup downloaded files
+        try:
+            for file in os.listdir(submissions_path):
+                file_path = os.path.join(submissions_path, file)
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+            print("Temporary submission files cleaned up.")
+        except Exception as e:
+            print(f"Error during cleanup: {str(e)}")
+
+
         return jsonify({
             'overall_avg_plagiarism': overall_avg_plagiarism,
             'grading_results': grading_results
