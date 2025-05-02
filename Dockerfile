@@ -27,7 +27,7 @@ COPY . .
 RUN mkdir -p uploads/UPLOAD_FOLDER uploads/HANDWRITTEN_FOLDER uploads/CONTEXT_FOLDER uploads/submissions
 
 # Expose port
-EXPOSE 8080
+EXPOSE 80
 
 # Run Flask development server
-CMD ["flask", "run"]
+CMD ["bash", "build.sh"]
