@@ -466,32 +466,111 @@ def process_assignments():
 
                 difficulty_level = "hard"
                 assignment_context = f"""
-                    Please evaluate the following student assignment on the topic of {assignmentDescription} and generate detailed HTML feedback using this structure:
+                        Please evaluate the following student assignment on the topic of "{assignmentDescription}" and generate **detailed, structured HTML feedback**. The tone should be constructive, educational, and tailored to help the student improve.
 
-                    1. Break down the feedback into the following five key criteria:
-                    - **Clarity and Organization (out of 20)**
-                    - **Technical Accuracy and Depth (out of 30)**
-                    - **Relevance to the Topic (out of 20)**
-                    - **Analytical Rigor (out of 15)**
-                    - **Overall Coherence (out of 15)**
+                        ---
 
-                    2. For each criterion, provide:
-                    - A score (e.g., 14/20)
-                    - 2 to 5 bullet-point observations supporting the score
+                        **Evaluation Instructions**:
 
-                    3. Add a **Detailed Feedback** section:
-                    - Include specific observations on what was missing, how the work could be improved, and suggestions for deeper analysis or content organization.
+                        Break down the feedback into the following sections using styled HTML:
 
-                    4. Add a **Summary** section:
-                    - Write 1–2 concise sentences summarizing the overall performance and final impression.
+                        ### 1. Criteria Breakdown:
+                        Evaluate based on the following five major criteria, each scored separately:
+                        - Clarity and Organization (out of 20)
+                        - Technical Accuracy and Depth (out of 30)
+                        - Relevance to the Topic (out of 20)
+                        - Analytical Rigor (out of 15)
+                        - Overall Coherence (out of 15)
 
-                    5. Format the entire feedback inside a clean, responsive HTML table with this structure:
-                    - Use simple borders and padding for readability.
-                    - No bold colors or UI elements.
-                    - Ensure it looks good on both desktop and mobile.
+                        For each criterion:
+                        - Assign a score (e.g., 18/30)
+                        - Provide 2–5 bullet points with specific observations to justify the score
 
-                    Grade this assignment at a {difficulty_level} level, and ensure that the assessment is aligned with the assignment topic: {assignmentDescription}.
-                    """
+                        ### 2. Detailed Assignment Review:
+                        Include a full paragraph (or two) of in-depth analysis of the student's submission. Go beyond scoring to:
+                        - Acknowledge what was done well
+                        - Explain what needs improvement
+                        - Offer actionable suggestions on structure, content depth, clarity, and alignment with the topic
+                        - Keep it supportive and growth-oriented
+
+                        ### 3. Summary:
+                        Write 1–2 concise sentences summarizing the overall performance, strengths, and areas for improvement.
+
+                        ---
+
+                        **Format Requirements**:
+
+                        Return the feedback in styled HTML with spacing between sections and a clean, readable layout.
+
+                        ```html
+                        <div style="margin: 20px 0; font-family: Arial, sans-serif;">
+                        <style>
+                            .feedback-table {{
+                            width: 100%;
+                            border-collapse: collapse;
+                            font-family: Arial, sans-serif;
+                            font-size: 14px;
+                            margin-bottom: 30px;
+                            }}
+                            .feedback-table th, .feedback-table td {{
+                            border: 1px solid #ccc;
+                            padding: 10px 14px;
+                            text-align: left;
+                            vertical-align: top;
+                            }}
+                            .feedback-table th {{
+                            background-color: #f0f0f0;
+                            font-weight: bold;
+                            }}
+                            .feedback-table tr:nth-child(even) {{
+                            background-color: #fafafa;
+                            }}
+                            @media screen and (max-width: 600px) {{
+                            .feedback-table th, .feedback-table td {{
+                                padding: 8px 10px;
+                                font-size: 13px;
+                            }}
+                            }}
+                        </style>
+
+                        <table class="feedback-table">
+                            <thead>
+                            <tr>
+                                <th>Criteria</th>
+                                <th>Feedback</th>
+                                <th style="text-align:center;">Score</th>
+                            </tr>
+                            </thead>
+                            <tbody>
+                            <!-- Dynamic rows for each criterion -->
+                            <tr>
+                                <td>Clarity and Organization</td>
+                                <td>
+                                - Introduction sets context but lacks flow<br>
+                                - Paragraph transitions could be smoother<br>
+                                - Ideas are mostly organized but slightly repetitive
+                                </td>
+                                <td style="text-align:center;">14/20</td>
+                            </tr>
+                            <!-- Repeat for other 4 criteria -->
+
+                            <!-- Detailed review -->
+                            <tr>
+                                <td colspan="3"><strong>Detailed Assignment Review</strong><br>
+                                The assignment demonstrates moderate understanding of the core topic. The student made a clear attempt to address key ideas but lacked consistent depth. For instance, the analysis of {assignmentDescription} misses supporting examples or fails to elaborate on implications. Improving logical flow between sections and reinforcing claims with evidence would elevate the submission. Consider revisiting the course materials or examples to better frame arguments.
+                                </td>
+                            </tr>
+
+                            <!-- Summary -->
+                            <tr>
+                                <td colspan="3"><strong>Summary</strong><br>
+                                A fair attempt with solid effort. Key improvements in structure and depth will greatly enhance clarity and impact.
+                                </td>
+                            </tr>
+                            </tbody>
+                        </table>
+                        </div>
+                        """
 
 
                 group_grades = {}
