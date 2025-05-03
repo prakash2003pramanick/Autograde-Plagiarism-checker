@@ -406,6 +406,8 @@ def process_assignments():
                                 'error': error_msg
                             })
                             
+                        del pdf_bytes
+                            
                     except Exception as e:
                         error_msg = f"Error processing PDF {file_name}: {str(e)}"
                         print(error_msg)
@@ -464,17 +466,33 @@ def process_assignments():
 
                 difficulty_level = "hard"
                 assignment_context = f"""
-                    Please thoroughly grade the following assignment on the topic of {assignmentDescription}.
-                    Your evaluation should address the following aspects:
-                    1. **Clarity and Organization:** Assess how clearly the assignment is written and how well the content is structured.
-                    2. **Technical Accuracy and Depth:** Evaluate the correctness and depth of technical details related to {assignmentDescription}, including both theoretical understanding and practical application.
-                    3. **Relevance to the Topic:** Check if the assignment covers key points, such as critical issues, innovative approaches, and context-specific challenges relevant to {assignmentDescription}.
-                    4. **Analytical Rigor:** Critically analyze the argumentation, supporting data, and reasoning presented.
-                    5. **Overall Coherence:** Consider the logical flow and coherence of the overall assignment.
+                    Please evaluate the following student assignment on the topic of {assignmentDescription} and generate detailed HTML feedback using this structure:
 
-                    Please grade the assignment at a {difficulty_level} level and provide a numerical grade out of {MAX_SCORE} along with detailed, constructive feedback highlighting both strengths and areas for improvement.
-                    Make sure that the provided assignment work or extract aligns with the topic correctly.
+                    1. Break down the feedback into the following five key criteria:
+                    - **Clarity and Organization (out of 20)**
+                    - **Technical Accuracy and Depth (out of 30)**
+                    - **Relevance to the Topic (out of 20)**
+                    - **Analytical Rigor (out of 15)**
+                    - **Overall Coherence (out of 15)**
+
+                    2. For each criterion, provide:
+                    - A score (e.g., 14/20)
+                    - 2 to 5 bullet-point observations supporting the score
+
+                    3. Add a **Detailed Feedback** section:
+                    - Include specific observations on what was missing, how the work could be improved, and suggestions for deeper analysis or content organization.
+
+                    4. Add a **Summary** section:
+                    - Write 1–2 concise sentences summarizing the overall performance and final impression.
+
+                    5. Format the entire feedback inside a clean, responsive HTML table with this structure:
+                    - Use simple borders and padding for readability.
+                    - No bold colors or UI elements.
+                    - Ensure it looks good on both desktop and mobile.
+
+                    Grade this assignment at a {difficulty_level} level, and ensure that the assessment is aligned with the assignment topic: {assignmentDescription}.
                     """
+
 
                 group_grades = {}
                 print("Grading groups using Gemini API...")
