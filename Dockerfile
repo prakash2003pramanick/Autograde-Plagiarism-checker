@@ -27,6 +27,7 @@ COPY . .
 
 # Expose application port
 EXPOSE 5000
+# Set environment variables
 
 # Run the app
 CMD ["python","-u", "run.py"]
